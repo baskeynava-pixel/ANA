@@ -1,0 +1,79 @@
+name: Build & Release Debug APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Prepare debug keystore
+        run: |
+          if [ ! -f "debug.keystore" ] && [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+
+      - name: Build Debug APK
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug --stacktrace
+          else
+            gradle assembleDebug --stacktrace
+          fi
+
+      - name: Upload APK as GitHub Actions Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Prepare Release Asset
+        id: prepare_asset
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_REF}" != refs/tags/* ]]; then
+            TAG_NAME="v1.0.${{ github.run_number }}"
+          fi
+          ASSET_NAME="jarvis-${TAG_NAME}-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "${ASSET_NAME}"
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "asset_name=${ASSET_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Publish GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: ${{ steps.prepare_asset.outputs.tag_name }}
+          name: Release ${{ steps.prepare_asset.outputs.tag_name }}
+          draft: false
+          prerelease: false
+          files: ${{ steps.prepare_asset.outputs.asset_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

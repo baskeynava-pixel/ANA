@@ -1,0 +1,6 @@
+{
+  "name": "J.A.R.V.I.S.",
+  "description": "Autonomous voice-first AI copilot and personal knowledge assistant with real-time HUD diagnostics, smart IoT control, and proactive workflow automation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
